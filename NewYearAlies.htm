@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Новогодний Алиас</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #002f4b;
+            background-image: linear-gradient(to bottom, #002f4b, #005e95);
+            text-align: center;
+            padding: 20px;
+            color: #f0f8ff;
+        }
+        h1 {
+            font-size: 48px;
+            color: #f0f8ff;
+            margin-top: 20px;
+            text-shadow: 2px 2px 4px #004a6d;
+        }
+        .info, .scoreboard {
+            margin: 20px 0;
+            font-size: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 10px;
+            border-radius: 10px;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);
+        }
+        .word-container {
+            margin: 20px;
+            font-size: 30px;
+            font-weight: bold;
+            color: #e0f7ff;
+        }
+        .timer {
+            font-size: 22px;
+            margin: 10px;
+            color: #d1efff;
+        }
+        .button-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        button {
+            padding: 15px 30px;
+            margin: 10px;
+            font-size: 18px;
+            cursor: pointer;
+            background-color: #005e95;
+            border: none;
+            border-radius: 5px;
+            color: #f0f8ff;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+        button:hover {
+            background-color: #0074c7;
+            transform: scale(1.05);
+        }
+        input {
+            padding: 10px;
+            margin: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Новогодний Алиас</h1>
+    <div class="info" id="setupMenu">
+        <p>Введите количество команд:</p>
+        <input type="number" id="teamCount" min="2" max="10" placeholder="Минимум 2 команды">
+        <button onclick="setupTeams()">Далее</button>
+    </div>
+    <div id="teamNamesMenu" style="display:none;">
+        <p>Введите названия команд:</p>
+        <div id="teamInputs"></div>
+        <button onclick="startGameMenu()">Начать игру</button>
+    </div>
+    <div id="gameMenu" style="display:none;">
+        <p>Выберите уровень сложности:</p>
+        <button onclick="startGame('easy')">Легкий</button>
+        <button onclick="startGame('medium')">Средний</button>
+        <button onclick="startGame('hard')">Сложный</button>
+        <button onclick="startGame('random')">Случайный</button>
+    </div>
+    <div id="gameContainer" style="display:none;">
+        <div class="info">
+            <p>Сейчас отвечает команда: <span id="currentTeamName"></span></p>
+        </div>
+        <div class="word-container" id="wordContainer">Нажмите "Начать", чтобы увидеть слово</div>
+        <div class="button-container">
+            <button id="startRoundButton" onclick="startTimer()">Начать</button>
+        </div>
+        <div class="timer">Оставшееся время: <span id="timeLeft">60</span> секунд</div>
+        <div class="button-container" style="display:none;" id="actionButtons">
+            <button id="correctButton" onclick="processWord(true)">Угадано</button>
+            <button id="wrongButton" onclick="processWord(false)">Пропустить</button>
+        </div>
+    </div>
+    <div id="roundResultsContainer" style="display:none;">
+        <h2>Результаты раунда</h2>
+        <div id="roundResults"></div>
+        <button onclick="continueNextRound()">Продолжить игру</button>
+        <button onclick="restartGame()">Начать заново</button>
+    </div>
+
+    <script>
+        const wordsEasy = ["Снег", "Ёлка", "Подарок", "Снеговик", "Мандарин"];
+        const wordsMedium = ["Гобелен", "Полярное сияние", "Эльф", "Лавровый венок"];
+        const wordsHard = ["Антарктида", "Полярная ночь", "Ледниковый период", "Северное сияние"];
+        let gameWords = [];
+        let currentIndex = 0;
+        let timer;
+        let currentTeamIndex = 0;
+        let teams = [];
+        let currentDifficulty = 'easy'; // Default difficulty
+        const timeLeftEl = document.getElementById("timeLeft");
+        const wordContainer = document.getElementById("wordContainer");
+        const currentTeamNameEl = document.getElementById("currentTeamName");
+        const startRoundButton = document.getElementById("startRoundButton");
+        const actionButtons = document.getElementById("actionButtons");
+
+        // Setup teams based on user input
+        function setupTeams() {
+            const teamCount = parseInt(document.getElementById("teamCount").value);
+            if (teamCount < 2 || isNaN(teamCount)) {
+                alert("Введите число от 2 до 10!");
+                return;
+            }
+            teams = Array.from({ length: teamCount }, () => ({ name: "", score: 0 }));
+            const teamInputs = document.getElementById("teamInputs");
+            teamInputs.innerHTML = "";
+            for (let i = 0; i < teamCount; i++) {
+                const input = document.createElement("input");
+                input.placeholder = `Название команды ${i + 1}`;
+                input.dataset.index = i;
+                input.oninput = (e) => teams[e.target.dataset.index].name = e.target.value;
+                teamInputs.appendChild(input);
+            }
+            document.getElementById("setupMenu").style.display = "none";
+            document.getElementById("teamNamesMenu").style.display = "block";
+        }
+
+        // Start game menu
+        function startGameMenu() {
+            if (teams.some(team => !team.name)) {
+                alert("Введите названия всех команд!");
+                return;
+            }
+            document.getElementById("teamNamesMenu").style.display = "none";
+            document.getElementById("gameMenu").style.display = "block";
+        }
+
+        // Start game with selected difficulty
+        function startGame(level) {
+            currentDifficulty = level;
+            switch (currentDifficulty) {
+                case 'easy':
+                    gameWords = [...wordsEasy];
+                    break;
+                case 'medium':
+                    gameWords = [...wordsMedium];
+                    break;
+                case 'hard':
+                    gameWords = [...wordsHard];
+                    break;
+                case 'random':
+                    gameWords = [...wordsEasy, ...wordsMedium, ...wordsHard].sort(() => Math.random() - 0.5);
+                    break;
+            }
+            currentIndex = 0;
+            currentTeamIndex = 0;
+            document.getElementById("gameMenu").style.display = "none";
+            startRound();
+        }
+
+        // Start a new round
+        function startRound() {
+            document.getElementById("gameContainer").style.display = "block";
+            actionButtons.style.display = "none";
+            startRoundButton.style.display = "block";
+            currentTeamNameEl.textContent = teams[currentTeamIndex].name;
+            wordContainer.textContent = "Нажмите 'Начать', чтобы увидеть слово";
+        }
+
+        // Start the timer for the round
+        function startTimer() {
+            startRoundButton.style.display = "none";
+            actionButtons.style.display = "flex";
+            let timeLeft = 30;
+            timeLeftEl.textContent = timeLeft;
+            timer = setInterval(() => {
+                timeLeft--;
+                timeLeftEl.textContent = timeLeft;
+                if (timeLeft <= 0) {
+                    clearInterval(timer);
+                    endTeamTurn();
+                }
+            }, 1000);
+            nextWord();
+        }
+
+        // Show the next word
+        function nextWord() {
+            if (currentIndex < gameWords.length) {
+                wordContainer.textContent = gameWords[currentIndex++];
+            } else {
+                endTeamTurn();
+            }
+        }
+
+        // Process the word as correct or incorrect
+        function processWord(correct) {
+            if (correct) teams[currentTeamIndex].score++;
+            nextWord();
+        }
+
+        // End the current team's turn and start the next one
+        function endTeamTurn() {
+            clearInterval(timer);
+            currentTeamIndex++;
+            if (currentTeamIndex >= teams.length) {
+                showRoundResults();
+            } else {
+                startRound();
+            }
+        }
+
+        // Show the results after the round ends
+        function showRoundResults() {
+            const results = teams.map(team => `${team.name}: ${team.score} очков`).join("<br>");
+            document.getElementById("gameContainer").style.display = "none";
+            document.getElementById("roundResultsContainer").style.display = "block";
+            document.getElementById("roundResults").innerHTML = results;
+        }
+
+        // Continue to the next round
+        function continueNextRound() {
+            currentTeamIndex = 0;
+            document.getElementById("roundResultsContainer").style.display = "none";
+            startRound();
+        }
+
+        // Restart the game
+        function restartGame() {
+            location.reload();
+        }
+    </script>
+</body>
+</html>
+
+
